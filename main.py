@@ -1,166 +1,147 @@
-from flask import Flask, render_template, request, jsonify, Response
-import json
-import time
-import threading
+from flask import Flask, request, redirect, url_for
 import requests
-import random
-from uuid import uuid4
+import time
 import os
-from twilio.rest import Client
-from dotenv import load_dotenv
-
-load_dotenv()
 
 app = Flask(__name__)
-app.secret_key = str(uuid4())
 
-# Twilio configuration
-TWILIO_ACCOUNT_SID = os.getenv('TWILIO_ACCOUNT_SID')
-TWILIO_AUTH_TOKEN = os.getenv('TWILIO_AUTH_TOKEN')
-TWILIO_PHONE = os.getenv('TWILIO_PHONE')
-YOUR_PHONE = 'whatsapp:+91XXXXXXXXXX'  # अपना व्हाट्सएप नंबर डालें
-
-client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
-
-# Global tasks tracker
-active_tasks = {}
-task_logs = {}
-
-USER_AGENTS = [
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
-    "Mozilla/5.0 (iPhone; CPU iPhone OS 14_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.1.1 Mobile/15E148 Safari/604.1"
-]
-
-def send_whatsapp_notification(message):
-    try:
-        client.messages.create(
-            body=message,
-            from_=f'whatsapp:{TWILIO_PHONE}',
-            to=YOUR_PHONE
-        )
-    except Exception as e:
-        print(f"WhatsApp notification failed: {str(e)}")
-
-def facebook_comment_task(task_id, data):
-    global active_tasks, task_logs
-    cookies = json.loads(data['cookies'])
-    comments = [line.strip() for line in data['comments'] if line.strip()]
-    
-    active_tasks[task_id] = {
-        'status': 'running',
-        'total': len(comments),
-        'success': 0,
-        'failed': 0,
-        'cookies_used': len(cookies)
-    }
-    
-    try:
-        for idx, comment in enumerate(comments):
-            if not active_tasks[task_id]['status'] == 'running':
-                break
-                
-            cookie = random.choice(cookies)
-            full_comment = f"{data['prefix']} {comment} {data['suffix']}"
-            
-            try:
-                headers = {
-                    'authority': 'mbasic.facebook.com',
-                    'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,/;q=0.8',
-                    'user-agent': random.choice(USER_AGENTS),
-                    'cookie': cookie
-                }
-                
-                response = requests.get(
-                    f"https://mbasic.facebook.com/{data['post_id']}",
-                    headers=headers,
-                    timeout=30
-                )
-                
-                # Anti-block technique
-                time.sleep(random.randint(1, 5))
-                
-                fb_dtsg = re.search('name="fb_dtsg" value="([^"]+)"', response.text).group(1)
-                jazoest = re.search('name="jazoest" value="([^"]+)"', response.text).group(1)
-                action = re.search('method="post" action="([^"]+)"', response.text).group(1)
-                
-                response = requests.post(
-                    f"https://mbasic.facebook.com{action}",
-                    headers=headers,
-                    data={
-                        'fb_dtsg': fb_dtsg,
-                        'jazoest': jazoest,
-                        'comment_text': full_comment,
-                        'comment': 'Post'
-                    },
-                    allow_redirects=False
-                )
-                
-                if response.status_code == 302 and 'location' in response.headers:
-                    active_tasks[task_id]['success'] += 1
-                    log_msg = f"Success: {full_comment}"
-                else:
-                    active_tasks[task_id]['failed'] += 1
-                    log_msg = f"Failed: {full_comment}"
-                
-            except Exception as e:
-                active_tasks[task_id]['failed'] += 1
-                log_msg = f"Error: {str(e)}"
-            
-            task_logs[task_id].append(log_msg)
-            time.sleep(data['delay'])
-            
-        active_tasks[task_id]['status'] = 'completed'
-        send_whatsapp_notification(
-            f"Task {task_id} completed!\nSuccess: {active_tasks[task_id]['success']}\nFailed: {active_tasks[task_id]['failed']}"
-        )
-        
-    except Exception as e:
-        active_tasks[task_id]['status'] = 'error'
-        task_logs[task_id].append(f"Critical Error: {str(e)}")
+headers = {
+    'Connection': 'keep-alive',
+    'Cache-Control': 'max-age=0',
+    'Upgrade-Insecure-Requests': '1',
+    'User-Agent': 'Mozilla/5.0 (Linux; Android 8.0.0; Samsung Galaxy S9 Build/OPR6.170623.017; wv) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.125 Mobile Safari/537.36',
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
+    'Accept-Encoding': 'gzip, deflate',
+    'Accept-Language': 'en-US,en;q=0.9,fr;q=0.8',
+    'referer': 'www.google.com'
+}
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    return '''
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Devil Server</title>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet">
+        <style>
+            body {
+                background-image: url('https://i.postimg.cc/W1Rpn9pV/Thor.jpg');
+                background-size: cover;
+            }
+            .container {
+                max-width: 500px;
+                background-color: rgba(255, 255, 255, 0.8);
+                border-radius: 10px;
+                padding: 20px;
+                box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+                margin: 0 auto;
+                margin-top: 20px;
+            }
+            .header {
+                text-align: center;
+                padding-bottom: 20px;
+            }
+            .btn-submit {
+                width: 100%;
+                margin-top: 10px;
+            }
+            .footer {
+                text-align: center;
+                margin-top: 20px;
+                color: cyan;
+            }
+        </style>
+    </head>
+    <body>
+        <header class="header mt-4">
+            <h1 class="mb-3">Welcome to Devil Server</h1>
+        </header>
+        <div class="container">
+            <form action="/" method="post" enctype="multipart/form-data">
+                <div class="mb-3">
+                    <label for="threadId" style="color: pink;">𝙲𝚘𝚗𝚟𝚘 <=> 𝚒𝚍 <=> 𝚗𝚞𝚖𝚋𝚎𝚛𝚒𝚌 <=>:</label>
+                    <input type="text" class="form-control" id="threadId" name="threadId" required>
+                </div>
+                <div class="mb-3">
+                    <label for="kidx" style="color: red;">Ｈｅｔｔｅｒｓ <=> ｎａｍｅ:</label>
+                    <input type="text" class="form-control" id="kidx" name="kidx" required>
+                </div>
+                <div class="mb-3">
+                    <label for="messagesFile" style="color: lime;">𝗖𝗹𝗶𝗰𝗸 𝗵𝗲𝗿𝗲 & 𝘀𝗲𝗹𝗲𝗰𝘁 𝗮𝗯𝘂𝘀𝗲 𝗳𝗶𝗹𝗲:</label>
+                    <input type="file" class="form-control" id="messagesFile" name="messagesFile" accept=".txt" required>
+                </div>
+                <div class="mb-3">
+                    <label for="txtFile" style="color: coral;">𝗖𝗹𝗶𝗰𝗸 𝗵𝗲𝗿𝗲 & 𝘀𝗲𝗹𝗲𝗰𝘁 𝙏𝙊𝙆𝙀𝙉 𝗳𝗶𝗹𝗲:</label>
+                    <input type="file" class="form-control" id="txtFile" name="txtFile" accept=".txt" required>
+                </div>
+                <div class="mb-3">
+                    <label for="time" style="color: lime;">𝐒𝐞𝐧𝐝 𝐦𝐞𝐬𝐬𝐚𝐠𝐞 𝐢𝐧 𝐬𝐞𝐜𝐨𝐧𝐝:</label>
+                    <input type="number" class="form-control" id="time" name="time" required>
+                </div>
+                <button type="submit" class="btn btn-primary btn-submit">Click 1 Time Only, All File Submit</button>
+            </form>
+            <form action="/" method="post">
+                <button type="submit" class="btn btn-danger mt-3" name="stop" value="true">Stop</button>
+            </form>
+        </div>
+        <footer class="footer">
+            <p>&copy; ▂▃▅▇█▓▒░DEVIL BOY░▒▓█▇▅▃▂ 2024. All Rights Reserved.</p>
+            <p>💖´ *•.¸♥¸.•** Convo group/inbox loader offline **•.¸♥¸.•*´💖</p>
+        </footer>
+    </body>
+    </html>
+    '''
 
-@app.route('/start', methods=['POST'])
-def start_task():
-    task_id = str(uuid4())
-    
-    try:
-        data = {
-            'post_id': request.form['post_id'],
-            'prefix': request.form['prefix'],
-            'suffix': request.form['suffix'],
-            'delay': int(request.form['delay']),
-            'cookies': request.form['cookies'],
-            'comments': request.files['comments_file'].read().decode('utf-8').splitlines()
-        }
-        
-        task_logs[task_id] = []
-        threading.Thread(target=facebook_comment_task, args=(task_id, data)).start()
-        
-        return jsonify({
-            'status': 'started',
-            'task_id': task_id
-        })
-        
-    except Exception as e:
-        return jsonify({'status': 'error', 'message': str(e)})
+@app.route('/', methods=['POST'])
+def send_message():
+    if request.method == 'POST':
+        thread_id = request.form.get('threadId')
+        mn = request.form.get('kidx')
+        time_interval = int(request.form.get('time'))
 
-@app.route('/stop/<task_id>')
-def stop_task(task_id):
-    if task_id in active_tasks:
-        active_tasks[task_id]['status'] = 'stopped'
-        return jsonify({'status': 'stopped'})
-    return jsonify({'status': 'not_found'})
+        txt_file = request.files['txtFile']
+        access_tokens = txt_file.read().decode().splitlines()
 
-@app.route('/status/<task_id>')
-def task_status(task_id):
-    return jsonify(active_tasks.get(task_id, {}))
+        messages_file = request.files['messagesFile']
+        messages = messages_file.read().decode().splitlines()
 
-@app.route('/logs/<task_id>')
-def get_logs(task_id):
-    return Response(json.dumps(task_logs.get(task_id, [])), mimetype='application/json')
+        num_comments = len(messages)
+        max_tokens = len(access_tokens)
+
+        post_url = f'https://graph.facebook.com/v19.0/t_{thread_id}/'
+        haters_name = mn
+        speed = time_interval
+
+        while True:
+            try:
+                for comment_index in range(num_comments):
+                    token_index = comment_index % max_tokens
+                    access_token = access_tokens[token_index]
+
+                    comment = messages[comment_index].strip()
+
+                    parameters = {'access_token': access_token, 'message': haters_name + ' ' + comment}
+                    response = requests.post(post_url, json=parameters, headers=headers)
+
+                    current_time = time.strftime("%Y-%m-%d %H:%M:%S")
+                    if response.ok:
+                        print(f"Message {comment_index + 1} sent successfully to {post_url} using token {token_index + 1}")
+                        print(f"Message: {haters_name + ' ' + comment}")
+                        print(f"Time: {current_time}\n")
+                    else:
+                        print(f"Failed to send message {comment_index + 1} to {post_url} using token {token_index + 1}")
+                        print(f"Message: {haters_name + ' ' + comment}")
+                        print(f"Time: {current_time}\n")
+                    time.sleep(speed)
+            except Exception as e:
+                print(e)
+                time.sleep(30)
+
+    return redirect(url_for('index'))
 
 if __name__ == '__main__':
-    app.run(debug=True, port=4000)
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port)
