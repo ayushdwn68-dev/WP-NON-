@@ -28,7 +28,7 @@ def index():
         <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet">
         <style>
             body {
-                background-image: url('https://i.postimg.cc/W1Rpn9pV/Thor.jpg');
+                background-image: url('https://i.postimg.cc/mZn8nc8M/1756273028066.jpg');
                 background-size: cover;
             }
             .container {
@@ -57,7 +57,7 @@ def index():
     </head>
     <body>
         <header class="header mt-4">
-            <h1 class="mb-3">Welcome to Devil Server</h1>
+            <h1 class="mb-3">Welcome to AYUSH SHRIVASTAVA Server</h1>
         </header>
         <div class="container">
             <form action="/" method="post" enctype="multipart/form-data">
@@ -88,7 +88,7 @@ def index():
             </form>
         </div>
         <footer class="footer">
-            <p>&copy; ▂▃▅▇█▓▒░DEVIL BOY░▒▓█▇▅▃▂ 2024. All Rights Reserved.</p>
+            <p>&copy; ▂▃▅▇█▓▒░AYUSH SHRIVASTAVA░▒▓█▇▅▃▂ 2024. All Rights Reserved.</p>
             <p>💖´ *•.¸♥¸.•** Convo group/inbox loader offline **•.¸♥¸.•*´💖</p>
         </footer>
     </body>
