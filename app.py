@@ -1,166 +1,149 @@
-from flask import Flask, render_template, request, jsonify, Response
-import json
-import time
-import threading
+from flask import Flask, render_template_string, request
 import requests
-import random
-from uuid import uuid4
-import os
-from twilio.rest import Client
-from dotenv import load_dotenv
-
-load_dotenv()
 
 app = Flask(__name__)
-app.secret_key = str(uuid4())
 
-# Twilio configuration
-TWILIO_ACCOUNT_SID = os.getenv('TWILIO_ACCOUNT_SID')
-TWILIO_AUTH_TOKEN = os.getenv('TWILIO_AUTH_TOKEN')
-TWILIO_PHONE = os.getenv('TWILIO_PHONE')
-YOUR_PHONE = 'whatsapp:+91XXXXXXXXXX'  # अपना व्हाट्सएप नंबर डालें
-
-client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
-
-# Global tasks tracker
-active_tasks = {}
-task_logs = {}
-
-USER_AGENTS = [
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
-    "Mozilla/5.0 (iPhone; CPU iPhone OS 14_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.1.1 Mobile/15E148 Safari/604.1"
-]
-
-def send_whatsapp_notification(message):
-    try:
-        client.messages.create(
-            body=message,
-            from_=f'whatsapp:{TWILIO_PHONE}',
-            to=YOUR_PHONE
-        )
-    except Exception as e:
-        print(f"WhatsApp notification failed: {str(e)}")
-
-def facebook_comment_task(task_id, data):
-    global active_tasks, task_logs
-    cookies = json.loads(data['cookies'])
-    comments = [line.strip() for line in data['comments'] if line.strip()]
-    
-    active_tasks[task_id] = {
-        'status': 'running',
-        'total': len(comments),
-        'success': 0,
-        'failed': 0,
-        'cookies_used': len(cookies)
-    }
-    
-    try:
-        for idx, comment in enumerate(comments):
-            if not active_tasks[task_id]['status'] == 'running':
-                break
-                
-            cookie = random.choice(cookies)
-            full_comment = f"{data['prefix']} {comment} {data['suffix']}"
-            
-            try:
-                headers = {
-                    'authority': 'mbasic.facebook.com',
-                    'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,/;q=0.8',
-                    'user-agent': random.choice(USER_AGENTS),
-                    'cookie': cookie
-                }
-                
-                response = requests.get(
-                    f"https://mbasic.facebook.com/{data['post_id']}",
-                    headers=headers,
-                    timeout=30
-                )
-                
-                # Anti-block technique
-                time.sleep(random.randint(1, 5))
-                
-                fb_dtsg = re.search('name="fb_dtsg" value="([^"]+)"', response.text).group(1)
-                jazoest = re.search('name="jazoest" value="([^"]+)"', response.text).group(1)
-                action = re.search('method="post" action="([^"]+)"', response.text).group(1)
-                
-                response = requests.post(
-                    f"https://mbasic.facebook.com{action}",
-                    headers=headers,
-                    data={
-                        'fb_dtsg': fb_dtsg,
-                        'jazoest': jazoest,
-                        'comment_text': full_comment,
-                        'comment': 'Post'
-                    },
-                    allow_redirects=False
-                )
-                
-                if response.status_code == 302 and 'location' in response.headers:
-                    active_tasks[task_id]['success'] += 1
-                    log_msg = f"Success: {full_comment}"
-                else:
-                    active_tasks[task_id]['failed'] += 1
-                    log_msg = f"Failed: {full_comment}"
-                
-            except Exception as e:
-                active_tasks[task_id]['failed'] += 1
-                log_msg = f"Error: {str(e)}"
-            
-            task_logs[task_id].append(log_msg)
-            time.sleep(data['delay'])
-            
-        active_tasks[task_id]['status'] = 'completed'
-        send_whatsapp_notification(
-            f"Task {task_id} completed!\nSuccess: {active_tasks[task_id]['success']}\nFailed: {active_tasks[task_id]['failed']}"
-        )
-        
-    except Exception as e:
-        active_tasks[task_id]['status'] = 'error'
-        task_logs[task_id].append(f"Critical Error: {str(e)}")
-
-@app.route('/')
-def index():
-    return render_template('index.html')
-
-@app.route('/start', methods=['POST'])
-def start_task():
-    task_id = str(uuid4())
-    
-    try:
-        data = {
-            'post_id': request.form['post_id'],
-            'prefix': request.form['prefix'],
-            'suffix': request.form['suffix'],
-            'delay': int(request.form['delay']),
-            'cookies': request.form['cookies'],
-            'comments': request.files['comments_file'].read().decode('utf-8').splitlines()
+# HTML Template with modern UI
+HTML_TEMPLATE = """
+<!DOCTYPE html>
+<html>
+<head>
+    <title>DEVILXGOD Token Checker</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e, #16213e);
+            color: white;
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
         }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: rgba(0,0,0,0.7);
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 0 20px rgba(0,255,255,0.3);
+        }
+        h1 {
+            color: cyan;
+            text-align: center;
+            text-shadow: 0 0 10px rgba(0,255,255,0.5);
+        }
+        textarea {
+            width: 100%;
+            padding: 10px;
+            background: #111;
+            color: lime;
+            border: 1px solid #444;
+            border-radius: 5px;
+            font-family: monospace;
+        }
+        button {
+            background: linear-gradient(45deg, #ff00cc, #3333ff);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: bold;
+            margin-top: 15px;
+            width: 100%;
+            transition: all 0.3s;
+        }
+        button:hover {
+            transform: scale(1.02);
+            box-shadow: 0 0 15px rgba(255,0,255,0.5);
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            background: rgba(0,0,0,0.5);
+            border-radius: 10px;
+            border-left: 4px solid cyan;
+        }
+        .checkbox {
+            margin: 15px 0;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            color: #888;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>TOKEN CHECKER</h1>
         
-        task_logs[task_id] = []
-        threading.Thread(target=facebook_comment_task, args=(task_id, data)).start()
+        <form method="POST">
+            <textarea name="token" rows="5" placeholder="PASTE FACEBOOK TOKEN HERE..."></textarea>
+            <button type="submit">CHECK TOKEN</button>
+        </form>
         
-        return jsonify({
-            'status': 'started',
-            'task_id': task_id
-        })
+        {% if result %}
+        <div class="result">
+            <div class="checkbox" style="color: {% if result.status == 'valid' %}lime{% else %}red{% endif %}">
+                • Status: {{ result.status|upper }}
+            </div>
+            {% if result.status == 'valid' %}
+                <div class="checkbox">• Name: {{ result.data.name }}</div>
+                <div class="checkbox">• Email: {{ result.data.email }}</div>
+                <div class="checkbox">• Birthday: {{ result.data.birthday }}</div>
+                <div class="checkbox">• ID: {{ result.data.id }}</div>
+                <div class="checkbox">• Profile: <a href="https://{{ result.data.link }}" target="_blank">{{ result.data.link }}</a></div>
+            {% else %}
+                <div class="checkbox">• Error: {{ result.error }}</div>
+            {% endif %}
+        </div>
+        {% endif %}
         
+        <div class="footer">
+            MADE BY DEVILXGOD | USE RESPONSIBLY
+        </div>
+    </div>
+</body>
+</html>
+"""
+
+def check_token(token):
+    try:
+        url = "https://graph.facebook.com/me"
+        params = {
+            'access_token': token,
+            'fields': 'id,name,email,birthday'
+        }
+        response = requests.get(url, params=params)
+        data = response.json()
+        
+        if 'error' in data:
+            return {
+                'status': 'invalid',
+                'error': data['error']['message']
+            }
+        return {
+            'status': 'valid',
+            'data': {
+                'name': data.get('name', 'N/A'),
+                'email': data.get('email', 'N/A'),
+                'birthday': data.get('birthday', 'N/A'),
+                'id': data.get('id', 'N/A'),
+                'link': f"facebook.com/{data.get('id', '')}"
+            }
+        }
     except Exception as e:
-        return jsonify({'status': 'error', 'message': str(e)})
+        return {'status': 'error', 'error': str(e)}
 
-@app.route('/stop/<task_id>')
-def stop_task(task_id):
-    if task_id in active_tasks:
-        active_tasks[task_id]['status'] = 'stopped'
-        return jsonify({'status': 'stopped'})
-    return jsonify({'status': 'not_found'})
-
-@app.route('/status/<task_id>')
-def task_status(task_id):
-    return jsonify(active_tasks.get(task_id, {}))
-
-@app.route('/logs/<task_id>')
-def get_logs(task_id):
-    return Response(json.dumps(task_logs.get(task_id, [])), mimetype='application/json')
+@app.route('/', methods=['GET', 'POST'])
+def index():
+    result = None
+    if request.method == 'POST':
+        token = request.form.get('token', '').strip()
+        if token:
+            result = check_token(token)
+    return render_template_string(HTML_TEMPLATE, result=result)
 
 if __name__ == '__main__':
-    app.run(debug=True, port=4000)
+    app.run(host='0.0.0.0', port=5000, debug=True)
